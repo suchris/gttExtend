@@ -2,7 +2,7 @@
     "compilerOptions": {
       "module": "commonjs",
       "target": "es6",
-      "lib": ["es6", "es2016", "ES2016.Array.Include", "dom", "ES2017.object"],
+      "lib": ["es6", "es2016", "es2016.array.include", "dom", "es2017.object"],
       "noImplicitAny": true,
       "noImplicitReturns": true,
       "noImplicitThis": true,
