@@ -13,11 +13,12 @@
  ***************************************************************************************************************************/
 
 import * as GTT from 'gdax-trading-toolkit';
-import { GeminiMarketFeed } from "gdax-trading-toolkit/build/src/exchanges/gemini/GeminiMarketFeed";
+
 import { FeedFactory as GeminiFeedFactory } from "gdax-trading-toolkit/build/src/factories/geminiFactories"
 import { LiveBookConfig, LiveOrderbook, SkippedMessageEvent, TradeMessage } from "gdax-trading-toolkit/build/src/core";
 import { Ticker } from "gdax-trading-toolkit/build/src/exchanges/PublicExchangeAPI";
 import { CumulativePriceLevel } from "gdax-trading-toolkit/build/src/lib";
+import { ExchangeFeed } from 'gdax-trading-toolkit/build/src/exchanges';
 
 const product = 'BTC-USD';
 const logger = GTT.utils.ConsoleLoggerFactory({ level: 'debug' });
@@ -27,44 +28,48 @@ const printTicker = GTT.utils.printTicker;
  Simple demo that sets up a live order book and then periodically prints some stats to the console.
  */
 
-let tradeVolume: number = 0;
+ // ExchangeFeed
+ const makeFeedHandler = () => {
+     return (feed: ExchangeFeed) => {
+        const config: LiveBookConfig = {
+            product: product,
+            logger: logger
+        };
 
-GeminiFeedFactory(logger, product).then((feed: GeminiMarketFeed) => {
-// Configure the live book object
-    const config: LiveBookConfig = {
-        product: product,
-        logger: logger
-    };
-    const book = new LiveOrderbook(config);
-    book.on('LiveOrderbook.snapshot', () => {
-        logger.log('info', 'Snapshot received by LiveOrderbook Demo');
-        setInterval(() => {
-            console.log(printOrderbook(book, 10));
-            printOrderbookStats(book);
-            logger.log('info', `Cumulative trade volume: ${tradeVolume.toFixed(4)}`);
-        }, 5000);
-    });
-    book.on('LiveOrderbook.ticker', (ticker: Ticker) => {
-        console.log(printTicker(ticker));
-    });
-    book.on('LiveOrderbook.trade', (trade: TradeMessage) => {
-        tradeVolume += +(trade.size);
-    });
-    book.on('LiveOrderbook.skippedMessage', (details: SkippedMessageEvent) => {
-        // On GDAX, this event should never be emitted, but we put it here for completeness
-        console.log('SKIPPED MESSAGE', details);
-        console.log('Reconnecting to feed');
-        feed.reconnect(0);
-    });
-    book.on('end', () => {
-        console.log('Orderbook closed');
-    });
-    book.on('error', (err) => {
-        console.log('Livebook errored: ', err);
+        const book = new LiveOrderbook(config);
+        book.on('LiveOrderbook.snapshot', () => {
+            logger.log('info', 'Snapshot received by LiveOrderbook Demo');
+            setInterval(() => {
+                console.log(printOrderbook(book, 10));
+                printOrderbookStats(book);
+                logger.log('info', `Cumulative trade volume: ${tradeVolume.toFixed(4)}`);
+            }, 5000);
+        });
+        
+        book.on('LiveOrderbook.ticker', (ticker: Ticker) => { console.log(printTicker(ticker)); });
+        book.on('LiveOrderbook.trade', (trade: TradeMessage) => { tradeVolume += +(trade.size); });
+        book.on('end', () => { console.log('Orderbook closed'); });
+        
+        book.on('LiveOrderbook.skippedMessage', (details: SkippedMessageEvent) => {
+            // On GDAX, this event should never be emitted, but we put it here for completeness
+            console.log('SKIPPED MESSAGE', details);
+            console.log('Reconnecting to feed');
+            feed.reconnect(0);
+        });
+
+        book.on('error', (err) => {
+            console.log('Livebook errored: ', err);
+            feed.pipe(book);
+        });
+
         feed.pipe(book);
-    });
-    feed.pipe(book);
-});
+     }
+ }
+
+
+let tradeVolume: number = 0;
+GeminiFeedFactory(logger, product)
+    .then(makeFeedHandler());
 
 function printOrderbookStats(book: LiveOrderbook) {
     console.log(`Number of bids:       \t${book.numBids}\tasks: ${book.numAsks}`);
