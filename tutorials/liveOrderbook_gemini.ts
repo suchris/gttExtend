@@ -28,6 +28,9 @@ const printTicker = GTT.utils.printTicker;
  */
 
 let tradeVolume: number = 0;
+let tradeValue: number = 0;
+let weightedPrice: number = 0;
+let depth: number = 5;
 
 GeminiFeedFactory(logger, product).then((feed: GeminiMarketFeed) => {
 // Configure the live book object
@@ -39,9 +42,9 @@ GeminiFeedFactory(logger, product).then((feed: GeminiMarketFeed) => {
     book.on('LiveOrderbook.snapshot', () => {
         logger.log('info', 'Snapshot received by LiveOrderbook Demo');
         setInterval(() => {
-            console.log(printOrderbook(book, 10));
+            console.log(printOrderbook(book, depth));
             printOrderbookStats(book);
-            logger.log('info', `Cumulative trade volume: ${tradeVolume.toFixed(4)}`);
+            logger.log('info', `Cumulative volume: ${tradeVolume.toFixed(4)} Weighted Price: ${weightedPrice.toFixed(4)}`);
         }, 5000);
     });
     book.on('LiveOrderbook.ticker', (ticker: Ticker) => {
@@ -49,6 +52,8 @@ GeminiFeedFactory(logger, product).then((feed: GeminiMarketFeed) => {
     });
     book.on('LiveOrderbook.trade', (trade: TradeMessage) => {
         tradeVolume += +(trade.size);
+        tradeValue += +(trade.size) * +(trade.price);
+        weightedPrice = tradeValue/tradeVolume;
     });
     book.on('LiveOrderbook.skippedMessage', (details: SkippedMessageEvent) => {
         // On GDAX, this event should never be emitted, but we put it here for completeness
@@ -69,8 +74,8 @@ GeminiFeedFactory(logger, product).then((feed: GeminiMarketFeed) => {
 function printOrderbookStats(book: LiveOrderbook) {
     console.log(`Number of bids:       \t${book.numBids}\tasks: ${book.numAsks}`);
     console.log(`Total ${book.baseCurrency} liquidity: \t${book.bidsTotal.toFixed(3)}\tasks: ${book.asksTotal.toFixed(3)}`);
-    let orders: CumulativePriceLevel[] = book.ordersForValue('buy', 100, false);
-    console.log(`Cost of buying 100 ${book.baseCurrency}: ${orders[orders.length - 1].cumValue.toFixed(2)} ${book.quoteCurrency}`);
-    orders = book.ordersForValue('sell', 1000, true);
-    console.log(`Need to sell ${orders[orders.length - 1].cumSize.toFixed(3)} ${book.baseCurrency} to get 1000 ${book.quoteCurrency}`);
+    let orders: CumulativePriceLevel[] = book.ordersForValue('buy', 10, false);
+    console.log(`Cost of buying 10 ${book.baseCurrency}: ${orders[orders.length - 1].cumValue.toFixed(2)} ${book.quoteCurrency}`);
+    orders = book.ordersForValue('sell', 100000, true);
+    console.log(`Need to sell ${orders[orders.length - 1].cumSize.toFixed(3)} ${book.baseCurrency} to get 100000 ${book.quoteCurrency}`);
 }
